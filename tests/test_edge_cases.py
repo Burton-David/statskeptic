@@ -84,6 +84,26 @@ def test_logistic_rejects_single_class():
         logistic(np.zeros(20), rng.normal(0, 1, 20).reshape(-1, 1), ["x"])
 
 
+def test_infinities_are_treated_as_missing_not_crashed_on():
+    # Regression for a real corpus file: inf in both groups made inf - inf = nan blow up
+    # the Hodges-Lehmann estimator. Infinities are now dropped like NaNs.
+    a = np.array([1.0, 2, 3, np.inf, 5, 6])
+    b = np.array([2.0, 4, np.inf, 8, 10, 12])
+    r = mann_whitney_u(a, b)
+    assert r.n == 10  # the two infinities were dropped
+
+    df = pd.DataFrame(
+        {
+            "arm": ["a"] * 10 + ["b"] * 10,
+            "score": np.concatenate(
+                [np.r_[np.full(1, np.inf), np.arange(9.0)], np.arange(10.0, 20.0)]
+            ),
+        }
+    )
+    report = analyze(df, "Does score differ by arm?")
+    assert report.analyses[0].result.n == 19  # one inf dropped, no crash
+
+
 # --- agent-level: the whole pipeline handles bad data without lying ---
 
 

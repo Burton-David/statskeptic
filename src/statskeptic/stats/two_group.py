@@ -21,8 +21,10 @@ from .results import (
 
 
 def _clean(x: np.ndarray) -> np.ndarray:
+    # Drop inf as well as nan: an infinity (often an upstream divide-by-zero) is not a
+    # measurement, and inf - inf in the rank estimator would otherwise produce nan.
     arr = np.asarray(x, dtype=float)
-    cleaned: np.ndarray = arr[~np.isnan(arr)]
+    cleaned: np.ndarray = arr[np.isfinite(arr)]
     return cleaned
 
 

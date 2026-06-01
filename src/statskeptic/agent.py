@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from pandas.api import types as pdt
 
@@ -22,6 +23,7 @@ from .critique.revise import (
     revise,
 )
 from .execution import execute
+from .loader import read_table
 from .plan.models import AnalysisPlan, Decline, Method, PlanHints, QuestionType
 from .plan.planner import plan as make_plan
 from .profile.models import DataProfile
@@ -46,8 +48,11 @@ def analyze(
 ) -> Report:
     if not 0.0 < alpha < 1.0:
         raise ValueError(f"alpha must be between 0 and 1 (exclusive); got {alpha}")
-    df = data if isinstance(data, pd.DataFrame) else pd.read_csv(data)
+    df = data if isinstance(data, pd.DataFrame) else read_table(data)
     df = _coerce_dates(df)
+    # Treat infinities as missing for the whole pipeline: the profiler then counts them
+    # as missing data and every downstream routine drops them with the NaNs.
+    df = df.replace([np.inf, -np.inf], np.nan)
     profile = build_profile(df)
     planned = make_plan(question, profile, hints)
 

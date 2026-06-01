@@ -22,7 +22,8 @@ from .results import (
 
 def _paired_clean(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     xa, ya = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
-    mask = ~(np.isnan(xa) | np.isnan(ya))
+    # Keep only pairs where both values are finite; inf is treated as missing.
+    mask = np.isfinite(xa) & np.isfinite(ya)
     return xa[mask], ya[mask]
 
 

@@ -91,6 +91,10 @@ Python 3.10 or newer. The core needs no API key and makes no network calls.
 statskeptic analyze data.csv --question "Does the treatment change recovery?"
 ```
 
+The reader detects the file's dialect (delimiter, quoting, encoding) with CleverCSV, so
+semicolon-delimited, tab-delimited, or non-UTF-8 files load as the table they actually
+are rather than a single mangled column, and infinities are treated as missing data.
+
 Options:
 
 - `--json` emits the full typed report, every number traceable to its computation.

@@ -32,7 +32,7 @@ def _clean_groups(
     out, out_labels = [], []
     for g, lab in zip(groups, labels, strict=True):
         arr = np.asarray(g, dtype=float)
-        arr = arr[~np.isnan(arr)]
+        arr = arr[np.isfinite(arr)]  # drop inf alongside nan
         if arr.size > 0:
             out.append(arr)
             out_labels.append(lab)
