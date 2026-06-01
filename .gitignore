@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Distribution / packaging / build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+sdist/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.tox/
+
+# Test / coverage / type-check / lint caches
+.pytest_cache/
+.benchmarks/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.hypothesis/
+
+# Secrets - never commit keys
+.env
+.env.*
+!.env.example
+
+# Local run artifacts (analyses, reports, cached LLM responses)
+.statskeptic/
+*.statskeptic.json
+
+# Documentation builds
+site/
+docs/_build/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*~

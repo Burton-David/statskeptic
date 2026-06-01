@@ -1,0 +1,116 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "statskeptic"
+version = "0.0.1"
+description = "An autonomous data-analysis agent that red-teams its own conclusions and reports what it cannot prove."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "David Burton", email = "42814680+Burton-David@users.noreply.github.com" }]
+keywords = [
+    "llm",
+    "agents",
+    "data-analysis",
+    "statistics",
+    "reproducibility",
+    "ai-safety",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+# The statistical engine is real, vetted code. The model plans, interprets, and
+# critiques; it never produces a number. So numerics are core; the LLM client is an
+# optional extra and the agent degrades to a plan-only / rule-only mode without it.
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.39"]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black==25.9.0",
+    "ruff>=0.4",
+    "mypy>=1.8",
+    "pandas-stubs",
+]
+
+[project.scripts]
+statskeptic = "statskeptic.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Burton-David/statskeptic"
+Repository = "https://github.com/Burton-David/statskeptic"
+Issues = "https://github.com/Burton-David/statskeptic/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/statskeptic"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "N"]
+ignore = ["E501", "E731"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: long-running tests (deselect with '-m \"not slow\"')",
+    "live: hits real external services; skipped by default in CI",
+    "paid: spends money on a paid API (LLM); never runs automatically",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["statskeptic"]
+
+[tool.coverage.report]
+show_missing = true
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
