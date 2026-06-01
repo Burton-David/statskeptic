@@ -46,8 +46,12 @@ def _profile_column(series: pd.Series, name: str, n_rows: int) -> ColumnProfile:
     n_unique = int(non_null.nunique())
     cardinality_fraction = n_unique / n_rows if n_rows else 0.0
     kind = _classify(series, non_null, n_unique)
+    # The cardinality heuristic only applies to label-like columns. A near-unique
+    # datetime is a time axis, not an identifier, and flagging it would wrongly trip the
+    # leakage check when that column is the predictor in a trend.
     is_likely_id = bool(_ID_NAME.search(name)) or (
-        cardinality_fraction > 0.95 and kind != ColumnKind.numeric
+        cardinality_fraction > 0.95
+        and kind in (ColumnKind.categorical, ColumnKind.text)
     )
 
     numeric_summary = None
