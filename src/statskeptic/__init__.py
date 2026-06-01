@@ -14,7 +14,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .agent import analyze
 from .critique.models import Critique, CritiqueCategory, Verdict
-from .errors import AnalysisError, PlanningError, StatskepticError
+from .errors import AnalysisError, StatskepticError
 from .plan.models import AnalysisPlan, Decline, Method, PlanHints, QuestionType
 from .profile.models import DataProfile
 from .report.models import Analysis, Report
@@ -34,7 +34,6 @@ __all__ = [
     "Decline",
     "Method",
     "PlanHints",
-    "PlanningError",
     "QuestionType",
     "Report",
     "StatskepticError",

@@ -62,6 +62,24 @@ def test_unmappable_question_is_declined():
     assert p.supported
 
 
+def test_comparison_of_two_categoricals_routes_to_chi_square():
+    # "differ" is a comparison cue, but with no numeric outcome and two categoricals the
+    # honest method is chi-square, not a t-test.
+    df = pd.DataFrame(
+        {"smoker": ["y", "n"] * 30, "diagnosis": ["pos", "neg", "neg", "pos"] * 15}
+    )
+    p = plan("Do smokers differ from non-smokers in diagnosis?", _profile(df))
+    assert not isinstance(p, Decline)
+    assert p.method == Method.chi_square
+
+
+def test_association_declines_when_columns_cannot_be_resolved():
+    # An association question with only one usable numeric column has no second variable.
+    df = pd.DataFrame({"height": np.arange(30.0), "label": ["x"] * 15 + ["yy"] * 15})
+    p = plan("Is there a correlation in this data?", _profile(df))
+    assert isinstance(p, Decline)
+
+
 def test_hints_override_column_matching():
     df = pd.DataFrame(
         {"grp": ["a", "b"] * 20, "m1": np.arange(40.0), "m2": np.arange(40.0)}

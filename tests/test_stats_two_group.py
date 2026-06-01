@@ -64,3 +64,11 @@ def test_skew_makes_normality_check_fail_at_high_severity():
     r = students_t(a, b)
     normality = [c for c in r.assumptions if c.name.startswith("normality")]
     assert any(not c.holds and c.severity.value == "high" for c in normality)
+    # worst_violation summarizes the failed checks for the critic to read.
+    assert r.worst_violation() is not None and r.worst_violation().value == "high"
+
+
+def test_clean_result_has_no_violation():
+    rng = np.random.default_rng(2)
+    r = students_t(rng.normal(0, 1, 60), rng.normal(0.1, 1, 60))
+    assert r.worst_violation() is None

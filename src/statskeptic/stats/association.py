@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
+from ..errors import AnalysisError
 from . import assumptions
 from ._support import captured_warnings, computation
 from .results import (
@@ -23,6 +24,20 @@ def _paired_clean(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     xa, ya = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
     mask = ~(np.isnan(xa) | np.isnan(ya))
     return xa[mask], ya[mask]
+
+
+def _guard_correlation(x: np.ndarray, y: np.ndarray) -> None:
+    # A correlation needs at least three paired points and variation in both variables;
+    # a constant column has no correlation to estimate, and scipy would warn or divide
+    # by zero rather than say so.
+    if x.size < 3:
+        raise AnalysisError(
+            f"a correlation needs at least 3 paired values; got {x.size}"
+        )
+    if np.ptp(x) == 0 or np.ptp(y) == 0:
+        raise AnalysisError(
+            "one of the variables is constant; correlation is undefined"
+        )
 
 
 def _interpret_r(r: float) -> str:
@@ -46,6 +61,7 @@ def pearson(
     alpha: float = 0.05,
 ) -> AssociationResult:
     x, y = _paired_clean(x, y)
+    _guard_correlation(x, y)
     n = x.size
     with captured_warnings():
         res = stats.pearsonr(x, y)
@@ -95,6 +111,7 @@ def spearman(
     alpha: float = 0.05,
 ) -> AssociationResult:
     x, y = _paired_clean(x, y)
+    _guard_correlation(x, y)
     n = x.size
     with captured_warnings():
         res = stats.spearmanr(x, y)
@@ -192,6 +209,12 @@ def chi_square(
 ) -> AssociationResult:
     """Chi-square test of independence on a contingency table of counts."""
     obs = np.asarray(table, dtype=float)
+    if obs.ndim != 2 or obs.shape[0] < 2 or obs.shape[1] < 2:
+        raise AnalysisError("chi-square needs a table of at least 2 rows and 2 columns")
+    if (obs.sum(axis=0) == 0).any() or (obs.sum(axis=1) == 0).any():
+        # An empty row or column means a category never appears; scipy cannot form the
+        # expected counts and the test is meaningless for it.
+        raise AnalysisError("a row or column of the table is all zeros; cannot test it")
     with captured_warnings():
         res = stats.chi2_contingency(obs, correction=True)
     chi2 = float(res.statistic)

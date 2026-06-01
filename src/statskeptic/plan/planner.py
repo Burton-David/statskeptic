@@ -218,20 +218,35 @@ def _plan_comparison(
     )
 
     if outcome is None or group is None:
-        # No categorical grouping variable. A causal-sounding question between two numeric
-        # columns ("does X cause Y") is really an association; route it there so the
-        # confounding check gets its say, rather than declining a question we can answer.
-        cats = [c for c in named if c.kind in _CATEGORICAL and _usable(c)]
-        if len(cats) >= 2:
+        # We could not form a clean numeric-outcome + categorical-group pair. Fall back to
+        # the profile's columns (the question may not have named them, e.g. "smokers" vs a
+        # column "smoker"): two categoricals -> chi-square, two numerics -> association.
+        # A causal question between two numerics ("does X cause Y") lands here too, so the
+        # confounding check still gets its say instead of an unhelpful decline.
+        named_cats = [c for c in named if c.kind in _CATEGORICAL and _usable(c)]
+        cats = (
+            named_cats
+            if len(named_cats) >= 2
+            else [c for c in profile.categorical() if _usable(c)]
+        )
+        named_nums = [c for c in named if c.kind == ColumnKind.numeric and _usable(c)]
+        nums = (
+            named_nums
+            if len(named_nums) >= 2
+            else [c for c in profile.numeric() if _usable(c)]
+        )
+
+        if outcome is None and len(cats) >= 2:
             return _association_plan(
                 question, QuestionType.comparison, cats[0], cats[1]
             )
-        nums = [c for c in named if c.kind == ColumnKind.numeric and _usable(c)]
-        if len(nums) < 2:
-            nums = [c for c in profile.numeric() if _usable(c)]
         if len(nums) >= 2:
             return _association_plan(
                 question, QuestionType.association, nums[0], nums[1]
+            )
+        if len(cats) >= 2:
+            return _association_plan(
+                question, QuestionType.comparison, cats[0], cats[1]
             )
         return Decline(
             reason=_unresolved_reason(outcome, group, "a numeric outcome and a group"),
@@ -344,6 +359,19 @@ def _plan_regression(
             reason="could not resolve the outcome to regress; name it with --outcome",
             supported=SUPPORTED,
         )
+    binary_outcome = outcome.kind == ColumnKind.boolean or outcome.n_unique == 2
+    if outcome.kind != ColumnKind.numeric and not binary_outcome:
+        # A nominal outcome with three or more levels needs multinomial regression, which
+        # is not in the v1 toolset. Running OLS on the category codes would be the kind of
+        # confident nonsense this tool exists to refuse.
+        return Decline(
+            reason=(
+                f"{outcome.name!r} has {outcome.n_unique} categories; regression here "
+                "supports a numeric outcome (OLS) or a two-level outcome (logistic), not "
+                "a multi-category one"
+            ),
+            supported=SUPPORTED,
+        )
     if hints.predictors:
         predictors = [p for p in hints.predictors if profile.by_name(p)]
     else:
@@ -356,7 +384,6 @@ def _plan_regression(
             supported=SUPPORTED,
         )
 
-    binary_outcome = outcome.kind == ColumnKind.boolean or outcome.n_unique == 2
     method = Method.logistic if binary_outcome else Method.ols
     kind_word = "binary" if binary_outcome else "continuous"
     return AnalysisPlan(

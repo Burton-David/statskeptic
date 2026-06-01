@@ -10,9 +10,20 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
+from ..errors import AnalysisError
 from . import assumptions
 from ._support import captured_warnings, computation
 from .results import AssumptionCheck, EffectSize, KGroupResult, Severity
+
+
+def _guard_k_group(groups: list[np.ndarray], n: int, k: int) -> None:
+    if k < 2:
+        raise AnalysisError(f"comparing groups needs at least 2 groups; got {k}")
+    if n <= k:
+        # df_within is n - k; at or below zero there is no within-group variance to test.
+        raise AnalysisError(f"not enough observations ({n}) for {k} groups")
+    if np.ptp(np.concatenate(groups)) == 0:
+        raise AnalysisError("every value is identical across all groups")
 
 
 def _clean_groups(
@@ -47,8 +58,9 @@ def anova_oneway(
 ) -> KGroupResult:
     groups, labels = _clean_groups(groups, labels)
     k = len(groups)
-    all_values = np.concatenate(groups)
+    all_values = np.concatenate(groups) if groups else np.array([])
     n = all_values.size
+    _guard_k_group(groups, n, k)
     grand_mean = all_values.mean()
 
     ss_between = float(sum(g.size * (g.mean() - grand_mean) ** 2 for g in groups))
@@ -100,6 +112,7 @@ def kruskal(
     groups, labels = _clean_groups(groups, labels)
     k = len(groups)
     n = sum(g.size for g in groups)
+    _guard_k_group(groups, n, k)
     with captured_warnings():
         res = stats.kruskal(*groups)
     h = float(res.statistic)

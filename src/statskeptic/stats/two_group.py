@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats
 
+from ..errors import AnalysisError
 from . import assumptions
 from ._support import captured_warnings, computation
 from .results import (
@@ -58,6 +59,14 @@ def _t_test(
 ) -> TwoGroupResult:
     a, b = _clean(a), _clean(b)
     n1, n2 = a.size, b.size
+    # A t-test needs the within-group variance, so each group needs at least two points,
+    # and at least one group has to vary. Without that the statistic is nan, not small.
+    if n1 < 2 or n2 < 2:
+        raise AnalysisError(
+            f"a t-test needs at least 2 observations per group; got {n1} and {n2}"
+        )
+    if np.ptp(a) == 0 and np.ptp(b) == 0:
+        raise AnalysisError("both groups are constant; there is no variation to test")
     with captured_warnings():
         res = stats.ttest_ind(a, b, equal_var=equal_var)
         ci = res.confidence_interval(confidence_level=1 - alpha)
@@ -169,6 +178,12 @@ def mann_whitney_u(
 ) -> TwoGroupResult:
     a, b = _clean(a), _clean(b)
     n1, n2 = a.size, b.size
+    if n1 < 1 or n2 < 1:
+        raise AnalysisError(
+            f"a rank test needs at least 1 observation per group; got {n1} and {n2}"
+        )
+    if np.ptp(np.concatenate([a, b])) == 0:
+        raise AnalysisError("every value is identical; there is nothing to rank")
     with captured_warnings():
         res = stats.mannwhitneyu(a, b, alternative="two-sided", method="auto")
 

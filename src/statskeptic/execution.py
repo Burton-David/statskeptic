@@ -39,6 +39,19 @@ def _two_levels(series: pd.Series) -> list[object]:
     return sorted(series.dropna().unique().tolist(), key=str)
 
 
+def _floats(series: pd.Series, name: str) -> np.ndarray:
+    # A column named as a numeric outcome may turn out to hold text (often via an explicit
+    # --outcome hint that bypassed the planner's type check). Fail with the column name
+    # rather than a bare numpy ValueError.
+    try:
+        out: np.ndarray = series.to_numpy(dtype=float)
+    except (ValueError, TypeError) as exc:
+        raise AnalysisError(
+            f"column {name!r} is not numeric, so this test cannot run on it"
+        ) from exc
+    return out
+
+
 def _two_group(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult:
     assert plan.outcome and plan.group and plan.method
     sub = df[[plan.outcome, plan.group]].dropna()
@@ -47,8 +60,8 @@ def _two_group(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult
         raise AnalysisError(
             f"a two-group test needs exactly two levels in {plan.group!r}, found {len(levels)}"
         )
-    a = sub.loc[sub[plan.group] == levels[0], plan.outcome].to_numpy(dtype=float)
-    b = sub.loc[sub[plan.group] == levels[1], plan.outcome].to_numpy(dtype=float)
+    a = _floats(sub.loc[sub[plan.group] == levels[0], plan.outcome], plan.outcome)
+    b = _floats(sub.loc[sub[plan.group] == levels[1], plan.outcome], plan.outcome)
     labels = {"label_a": str(levels[0]), "label_b": str(levels[1])}
     routines = {
         Method.students_t: stats.students_t,
@@ -63,7 +76,7 @@ def _k_group(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult:
     sub = df[[plan.outcome, plan.group]].dropna()
     levels = _two_levels(sub[plan.group])
     groups = [
-        sub.loc[sub[plan.group] == lv, plan.outcome].to_numpy(dtype=float)
+        _floats(sub.loc[sub[plan.group] == lv, plan.outcome], plan.outcome)
         for lv in levels
     ]
     labels = [str(lv) for lv in levels]
@@ -75,8 +88,8 @@ def _k_group(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult:
 
 def _correlation(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult:
     assert plan.outcome and plan.predictors
-    x = df[plan.outcome].to_numpy(dtype=float)
-    y = df[plan.predictors[0]].to_numpy(dtype=float)
+    x = _floats(df[plan.outcome], plan.outcome)
+    y = _floats(df[plan.predictors[0]], plan.predictors[0])
     routine = stats.pearson if plan.method == Method.pearson else stats.spearman
     return routine(x, y, label_x=plan.outcome, label_y=plan.predictors[0], alpha=alpha)
 
@@ -90,26 +103,25 @@ def _contingency(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResu
     return stats.chi_square(table, alpha=alpha)
 
 
-def _to_numeric_predictor(series: pd.Series) -> np.ndarray:
+def _to_numeric_predictor(series: pd.Series, name: str) -> np.ndarray:
     if pdt.is_datetime64_any_dtype(series):
         # A trend is the slope of the outcome against elapsed time; days since the first
         # observation is the natural, interpretable unit for that slope.
         days = (series - series.min()).dt.total_seconds() / 86400.0
         as_days: np.ndarray = days.to_numpy(dtype=float)
         return as_days
-    values: np.ndarray = series.to_numpy(dtype=float)
-    return values
+    return _floats(series, name)
 
 
 def _regression(plan: AnalysisPlan, df: pd.DataFrame, alpha: float) -> StatResult:
     assert plan.outcome and plan.predictors
     cols = [plan.outcome, *plan.predictors]
     sub = df[cols].dropna()
-    exog = np.column_stack([_to_numeric_predictor(sub[p]) for p in plan.predictors])
+    exog = np.column_stack([_to_numeric_predictor(sub[p], p) for p in plan.predictors])
     if plan.method == Method.logistic:
         y = _binary_outcome(sub[plan.outcome])
         return stats.logistic(y, exog, list(plan.predictors), alpha=alpha)
-    y = sub[plan.outcome].to_numpy(dtype=float)
+    y = _floats(sub[plan.outcome], plan.outcome)
     return stats.ols(y, exog, list(plan.predictors), alpha=alpha)
 
 

@@ -31,6 +31,21 @@ def _design(exog: np.ndarray, feature_names: list[str]) -> tuple[np.ndarray, lis
     return design, ["const", *feature_names]
 
 
+def _guard_design(y: np.ndarray, design: np.ndarray) -> None:
+    if design.shape[0] <= design.shape[1]:
+        raise AnalysisError(
+            f"not enough observations ({design.shape[0]}) for {design.shape[1]} terms"
+        )
+    if np.ptp(y) == 0:
+        raise AnalysisError("the outcome is constant; there is nothing to model")
+    # A rank-deficient design means a predictor is a linear combination of the others;
+    # the coefficients are not identifiable and statsmodels would divide by zero.
+    if np.linalg.matrix_rank(design) < design.shape[1]:
+        raise AnalysisError(
+            "predictors are perfectly collinear (singular design); drop a redundant one"
+        )
+
+
 def _conf_int_map(
     ci_array: np.ndarray, names: list[str], level: float, transform: str
 ) -> dict[str, ConfidenceInterval]:
@@ -58,6 +73,7 @@ def ols(
 ) -> RegressionResult:
     y = np.asarray(y, dtype=float)
     design, names = _design(exog, feature_names)
+    _guard_design(y, design)
     with captured_warnings():
         res = sm.OLS(y, design).fit()
 
@@ -124,7 +140,10 @@ def logistic(
     y = np.asarray(y, dtype=float)
     if not np.isin(np.unique(y[~np.isnan(y)]), [0.0, 1.0]).all():
         raise AnalysisError("logistic regression needs a 0/1 outcome")
+    if np.ptp(y) == 0:
+        raise AnalysisError("the outcome has only one class; there is nothing to model")
     design, names = _design(exog, feature_names)
+    _guard_design(y, design)
 
     try:
         with captured_warnings() as record:

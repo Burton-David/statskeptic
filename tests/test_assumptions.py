@@ -47,3 +47,21 @@ def test_expected_counts_rule():
     assert good.holds
     sparse = check_expected_cell_counts(np.array([[0.5, 0.5], [10, 10.0]]))
     assert not sparse.holds
+
+
+def test_normality_skips_shapiro_above_the_cap_and_judges_by_skew():
+    # Above ~5000 Shapiro over-rejects, so we report no W and decide on skew instead:
+    # clean data passes at low severity, heavy skew still fails at high severity.
+    rng = np.random.default_rng(0)
+    big_normal = check_normality(rng.normal(0, 1, 6000), "x")
+    assert big_normal.holds and big_normal.statistic is None
+    assert big_normal.severity.value == "low"
+
+    big_skewed = check_normality(rng.lognormal(0, 1, 6000), "x")
+    assert not big_skewed.holds and big_skewed.statistic is None
+    assert big_skewed.severity.value == "high"
+
+
+def test_normality_is_not_assessable_below_three():
+    c = check_normality(np.array([1.0, 2.0]), "x")
+    assert c.holds and c.severity.value == "info"

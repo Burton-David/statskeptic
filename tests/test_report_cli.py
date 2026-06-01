@@ -24,6 +24,20 @@ def test_explain_always_has_a_cannot_conclude_section(skewed_two_group):
     assert "## What this cannot conclude" in text
 
 
+def test_explain_renders_objections_and_limits_for_a_cannot_conclude_case():
+    rng = np.random.default_rng(11)
+    df = pd.DataFrame(
+        {
+            "grp": ["a"] * 9 + ["b"] * 9,
+            "y": np.concatenate([rng.normal(0, 1, 9), rng.normal(0.5, 1, 9)]),
+        }
+    )
+    text = analyze(df, "Does y differ between the groups?").explain()
+    assert "### Objections raised" in text
+    assert "Underpowered" in text  # the objection is rendered with its evidence
+    assert "Cannot conclude there is no effect" in text  # the limit is spelled out
+
+
 def test_to_json_round_trips(skewed_two_group):
     payload = analyze(skewed_two_group, "Does treatment change recovery?").to_json()
     data = json.loads(payload)

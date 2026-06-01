@@ -11,6 +11,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
+from pandas.api import types as pdt
 
 from .critique.engine import CritiqueContext, run_critique
 from .critique.models import Critique, Verdict
@@ -43,7 +44,10 @@ def analyze(
     hints: PlanHints | None = None,
     alpha: float = 0.05,
 ) -> Report:
+    if not 0.0 < alpha < 1.0:
+        raise ValueError(f"alpha must be between 0 and 1 (exclusive); got {alpha}")
     df = data if isinstance(data, pd.DataFrame) else pd.read_csv(data)
+    df = _coerce_dates(df)
     profile = build_profile(df)
     planned = make_plan(question, profile, hints)
 
@@ -59,6 +63,35 @@ def analyze(
     if planned.question_type == QuestionType.screen:
         return _run_screen(planned, df, profile, question, alpha)
     return _run_single(planned, df, profile, question, alpha)
+
+
+# Explicit formats only. Inferring dates from arbitrary strings is where pandas misreads
+# categorical codes as dates and emits warnings; an exact format either matches every
+# value in a column or that column is left exactly as it was.
+_DATE_FORMATS = ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d")
+
+
+def _coerce_dates(df: pd.DataFrame) -> pd.DataFrame:
+    out = df
+    for col in df.columns:
+        series = df[col]
+        # Only string columns are candidates (pandas 3 reads CSV text as the str dtype,
+        # not object). Numeric, datetime, and boolean columns are left untouched.
+        if not (pdt.is_object_dtype(series) or pdt.is_string_dtype(series)):
+            continue
+        non_null = series.dropna()
+        if non_null.empty:
+            continue
+        for fmt in _DATE_FORMATS:
+            try:
+                pd.to_datetime(non_null, format=fmt)
+            except (ValueError, TypeError):
+                continue
+            if out is df:
+                out = df.copy()
+            out[col] = pd.to_datetime(series, format=fmt, errors="coerce")
+            break
+    return out
 
 
 def _run_single(
