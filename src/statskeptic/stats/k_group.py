@@ -69,6 +69,16 @@ def anova_oneway(
 
     with captured_warnings():
         res = stats.f_oneway(*groups)
+    # A finite check is not enough: with negligible within-group variation the error term
+    # is zero or rounds negative, so F comes back inf, nan, or a meaningless negative and
+    # p is nan. Any of those means there is nothing for the test to weigh against.
+    if (
+        not (np.isfinite(res.statistic) and np.isfinite(res.pvalue))
+        or res.statistic < 0
+    ):
+        raise AnalysisError(
+            "no usable within-group variation; the F-ratio is undefined"
+        )
 
     normality_checks = [
         assumptions.check_normality(g, lab, alpha)

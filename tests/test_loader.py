@@ -68,3 +68,29 @@ def test_unreadable_file_is_a_value_error(tmp_path):
     path.write_bytes(b"\x00\x01\x02 not a table at all \xff\xfe")
     with pytest.raises(ValueError):
         read_table(path)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        # CRLF line endings (Windows export).
+        "arm,score\r\nctrl,1.0\r\ndrug,2.0\r\nctrl,1.5\r\n",
+        # A quoted field containing the delimiter and a newline.
+        'arm,note\nctrl,"a, b"\ndrug,"line1\nline2"\nctrl,"c"\n',
+        # A trailing delimiter on every row (a common ragged-export artifact).
+        "arm,score,\nctrl,1.0,\ndrug,2.0,\n",
+        # Whitespace-padded headers.
+        " arm , score \nctrl,1.0\ndrug,2.0\n",
+    ],
+    ids=["crlf", "quoted_newline", "trailing_delimiter", "padded_headers"],
+)
+def test_messy_variants_never_crash(tmp_path, content):
+    # The contract for an awkward-but-readable file: return a table or refuse with a
+    # ValueError, never a raw parser exception.
+    path = tmp_path / "v.csv"
+    path.write_text(content)
+    try:
+        df = read_table(path)
+    except ValueError:
+        return
+    assert df.shape[1] >= 1 and df.shape[0] >= 1

@@ -35,7 +35,9 @@ def _guard_correlation(x: np.ndarray, y: np.ndarray) -> None:
         raise AnalysisError(
             f"a correlation needs at least 3 paired values; got {x.size}"
         )
-    if np.ptp(x) == 0 or np.ptp(y) == 0:
+    # Variance, not range: a spread that squares to zero in float64 leaves the standard
+    # deviation at zero, which the correlation would divide by.
+    if np.var(x) == 0 or np.var(y) == 0:
         raise AnalysisError(
             "one of the variables is constant; correlation is undefined"
         )
@@ -66,6 +68,10 @@ def pearson(
     n = x.size
     with captured_warnings():
         res = stats.pearsonr(x, y)
+        # A spread too small relative to the magnitude leaves r numerically undefined
+        # (nan) even when the variance is technically nonzero; refuse rather than report.
+        if not np.isfinite(res.statistic):
+            raise AnalysisError("Pearson correlation is undefined for this data")
         ci = res.confidence_interval(confidence_level=1 - alpha)
     r = float(res.statistic)
     return AssociationResult(
@@ -117,6 +123,8 @@ def spearman(
     with captured_warnings():
         res = stats.spearmanr(x, y)
     rho = float(res.statistic)
+    if not np.isfinite(rho):
+        raise AnalysisError("Spearman correlation is undefined for this data")
 
     # No Spearman CI from scipy. Fisher z with the Bonett & Wright (2000) standard error
     # 1.03/sqrt(n-3), which is the Pearson SE inflated for the rank transform. Skip it

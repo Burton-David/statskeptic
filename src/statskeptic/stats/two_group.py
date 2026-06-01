@@ -45,6 +45,13 @@ def _cohens_d(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
     s1, s2 = np.var(a, ddof=1), np.var(b, ddof=1)
     sp = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
     d = float((a.mean() - b.mean()) / sp)
+    # A subnormal pooled SD (groups that are constant bar a denormalized wiggle) makes d
+    # astronomical, and d**2 below would overflow float64. That regime is degenerate, not
+    # a real effect, so refuse it rather than report a meaningless number.
+    if not np.isfinite(d) or abs(d) > 1e150:
+        raise AnalysisError(
+            "pooled variance is negligible; the effect size is not computable"
+        )
     # Hedges & Olkin (1985) large-sample variance of d; back it out to a normal-approx CI.
     se = np.sqrt((n1 + n2) / (n1 * n2) + d**2 / (2 * (n1 + n2)))
     return d, float(se)
@@ -67,8 +74,15 @@ def _t_test(
         raise AnalysisError(
             f"a t-test needs at least 2 observations per group; got {n1} and {n2}"
         )
-    if np.ptp(a) == 0 and np.ptp(b) == 0:
-        raise AnalysisError("both groups are constant; there is no variation to test")
+    # Guard on the pooled variance against the smallest normal float, not against zero.
+    # At extreme magnitudes the spread can be real yet subnormal, which makes the pooled
+    # SD underflow (Cohen's d divides by zero) or stay tiny (scipy returns t = -inf).
+    # Either way the groups are effectively constant and the test is degenerate.
+    pooled_var = ((n1 - 1) * np.var(a, ddof=1) + (n2 - 1) * np.var(b, ddof=1)) / (
+        n1 + n2 - 2
+    )
+    if pooled_var <= np.finfo(float).tiny:
+        raise AnalysisError("both groups are effectively constant; no usable variance")
     with captured_warnings():
         res = stats.ttest_ind(a, b, equal_var=equal_var)
         ci = res.confidence_interval(confidence_level=1 - alpha)

@@ -53,6 +53,9 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.8",
     "pandas-stubs",
+    # Property-based testing: explores degenerate inputs (nan, inf, ties, extremes) far
+    # more systematically than hand-written cases.
+    "hypothesis>=6.100",
     # Real-world dataset corpus for the opt-in robustness sweep (pytest -m slow).
     "pmlb>=1.0",
 ]

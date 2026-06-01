@@ -6,9 +6,18 @@ corpus uses; keeping them here means the tests exercise exactly what the README 
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
+from hypothesis import settings
+
+# statsmodels can be slow per example, so deadline is off in both profiles. The default
+# keeps the gate brisk; HYPOTHESIS_PROFILE=thorough is a deeper pass for release checks.
+settings.register_profile("default", max_examples=200, deadline=None)
+settings.register_profile("thorough", max_examples=2000, deadline=None)
+settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))
 
 
 @pytest.fixture

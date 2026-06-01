@@ -8,6 +8,7 @@ counts as a grouping factor, what looks like an identifier, how skewed a column 
 from __future__ import annotations
 
 import re
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -104,9 +105,18 @@ def _numeric_summary(non_null: pd.Series) -> NumericSummary:
     normal: bool | None = None
     normality_p: float | None = None
     if 3 <= arr.size <= _SHAPIRO_MAX_N and np.ptp(arr) > 0.0:
-        _, p = stats.shapiro(arr)
-        normal = bool(p >= 0.05)
-        normality_p = float(p)
+        # Shapiro warns (and its result is meaningless) when the data effectively has no
+        # range, which can happen at tiny magnitudes even when ptp is technically nonzero.
+        # Treat any such warning as "normality not assessable" rather than let it escape.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            try:
+                _, p = stats.shapiro(arr)
+                normal = bool(p >= 0.05)
+                normality_p = float(p)
+            except Exception:
+                normal = None
+                normality_p = None
 
     return NumericSummary(
         mean=float(arr.mean()),
