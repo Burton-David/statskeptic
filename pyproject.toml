@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "statskeptic"
-version = "0.1.0"
+version = "0.1.1"
 description = "An autonomous data-analysis agent that red-teams its own conclusions and reports what it cannot prove."
 readme = "README.md"
 requires-python = ">=3.10"
