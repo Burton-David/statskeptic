@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import warnings
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -139,13 +140,19 @@ def _correlations(
 ) -> dict[str, dict[str, float]]:
     if len(numeric_names) < 2:
         return {}
-    corr = df[numeric_names].corr(method="pearson")
+    frame = cast("pd.DataFrame", df[numeric_names])
+    # Read the matrix as a float array and index it positionally. Label indexing a
+    # correlation matrix returns pandas' scalar union, which does not narrow to
+    # something float() accepts, and pandas-stubs resolves selection by a list of
+    # labels to Series so .corr() looks like the two-Series overload.
+    matrix = frame.corr(method="pearson").to_numpy(dtype=float)
+    position = {name: i for i, name in enumerate(numeric_names)}
     out: dict[str, dict[str, float]] = {}
     for a in numeric_names:
         row = {
-            b: float(corr.loc[a, b])
+            b: float(matrix[position[a], position[b]])
             for b in numeric_names
-            if a != b and not pd.isna(corr.loc[a, b])
+            if a != b and not np.isnan(matrix[position[a], position[b]])
         }
         if row:
             out[a] = row

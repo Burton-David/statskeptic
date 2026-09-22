@@ -98,6 +98,15 @@ warn_unused_ignores = true
 no_implicit_optional = true
 ignore_missing_imports = true
 
+# numpy ships PEP 695 `type` statements in its stubs, which mypy refuses to
+# parse while python_version targets anything below 3.12. It aborts before
+# checking a single line of src, so the type gate silently stops running.
+# Skip numpy's stubs rather than raise the target and stop checking 3.10.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]

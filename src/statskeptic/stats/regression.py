@@ -12,7 +12,10 @@ import numpy as np
 import statsmodels.api as sm
 from numpy.linalg import LinAlgError
 from statsmodels.stats.outliers_influence import variance_inflation_factor
-from statsmodels.tools.sm_exceptions import PerfectSeparationError
+from statsmodels.tools.sm_exceptions import (
+    PerfectSeparationError,
+    PerfectSeparationWarning,
+)
 
 from ..errors import AnalysisError
 from . import assumptions
@@ -157,6 +160,17 @@ def logistic(
             "the logistic model is not identifiable (perfect separation), so the odds "
             f"ratios do not exist ({exc})"
         ) from exc
+
+    # statsmodels 0.15 stopped raising PerfectSeparationError. It now emits
+    # PerfectSeparationWarning and returns a diverged fit, so the handler above never
+    # fires on current versions and perfect separation would be demoted to the
+    # quasi-separation path below — reported with a caveat instead of refused. The
+    # warning carries the same meaning the exception did: no MLE exists.
+    if any(issubclass(w.category, PerfectSeparationWarning) for w in record):
+        raise AnalysisError(
+            "the logistic model is not identifiable (perfect separation), so the odds "
+            "ratios do not exist (statsmodels reported perfect separation)"
+        )
 
     # Quasi-separation rarely announces itself; it shows up as a fit that did not
     # converge or as coefficients blowing up on the log-odds scale. Treat any of those,
